@@ -1,7 +1,14 @@
-using EShop.Application.Service;
+using EShop.Application.Services;
+using EShop.Application.Services.Auth;
+using EShop.Domain.Models;
 using EShop.Domain.Repositories;
-using EShop.Domain.Seeders;
+using EShop.Infrastructure.Data;
+using EShop.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace EShopService
 {
@@ -11,19 +18,68 @@ namespace EShopService
         {
             var builder = WebApplication.CreateBuilder(args);
 
-
-            builder.Services.AddDbContext<DataContext>(x => x.UseInMemoryDatabase("TestDb"), ServiceLifetime.Transient);
-            builder.Services.AddScoped<IRepository, Repository>();
-            builder.Services.AddScoped<IMemberService, MemberService>();
-            builder.Services.AddScoped<IPointsService, PointsService>();
-            builder.Services.AddScoped<IRewardService, RewardService>();
-
-            // Loyalty program services will be registered here
-
+            // Add services to the container.
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+            // Configure DbContext
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            // Configure Identity
+            builder.Services.AddIdentity<User, IdentityRole>(options =>
+            {
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredLength = 8;
+            })
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+            // Configure JWT Authentication
+            var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
+            builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtSettings.SecretKey)),
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidIssuer = jwtSettings.Issuer,
+                    ValidAudience = jwtSettings.Audience,
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+            // Register repositories
+            builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+            // Register services
+            builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IMemberService, MemberService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
+            builder.Services.AddScoped<IRewardService, RewardService>();
+
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", builder =>
+                    builder.AllowAnyOrigin()
+                           .AllowAnyMethod()
+                           .AllowAnyHeader());
+            });
 
             var app = builder.Build();
 
@@ -35,15 +91,29 @@ namespace EShopService
             }
 
             app.UseHttpsRedirection();
+            app.UseCors("AllowAll");
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
 
-            // Loyalty program seeding can be added here if needed
+            // Create roles if they don't exist
+            using (var scope = app.Services.CreateScope())
+            {
+                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+                var roles = new[] { "Admin", "Member" };
+
+                foreach (var role in roles)
+                {
+                    if (!await roleManager.RoleExistsAsync(role))
+                    {
+                        await roleManager.CreateAsync(new IdentityRole(role));
+                    }
+                }
+            }
 
             app.Run();
         }
     }
-
 }

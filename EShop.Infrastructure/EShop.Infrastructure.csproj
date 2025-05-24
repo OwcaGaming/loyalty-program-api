@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
@@ -8,9 +8,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="7.0.14" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.14" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="7.0.14" />
   </ItemGroup>
 
-</Project>
+  <ItemGroup>
+    <ProjectReference Include="..\EShop.Domain\EShop.Domain.csproj" />
+    <ProjectReference Include="..\EShop.Application\EShop.Application.csproj" />
+  </ItemGroup>
+
+</Project> 
