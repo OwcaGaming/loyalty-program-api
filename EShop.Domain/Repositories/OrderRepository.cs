@@ -1,4 +1,4 @@
-using EShop.Infrastructure.Data;
+using EShop.Domain.Data;
 using EShop.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,14 +10,11 @@ public class OrderRepository : Repository<Order>, IOrderRepository
     {
     }
 
-    public async Task<IEnumerable<Order>> GetOrdersByMemberAsync(int memberId)
+    public async Task<IEnumerable<Order>> GetOrdersByMemberIdAsync(int memberId)
     {
         return await _dbSet
             .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.Product)
-            .Include(o => o.Invoice)
             .Where(o => o.MemberId == memberId)
-            .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
     }
 
@@ -25,10 +22,12 @@ public class OrderRepository : Repository<Order>, IOrderRepository
     {
         return await _dbSet
             .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.Product)
-            .Include(o => o.Member)
-            .Include(o => o.Invoice)
             .FirstOrDefaultAsync(o => o.Id == orderId);
+    }
+
+    public async Task<IEnumerable<Order>> GetOrdersByMemberAsync(int memberId)
+    {
+        return await GetOrdersByMemberIdAsync(memberId);
     }
 
     public async Task<IEnumerable<Order>> GetOrdersByStatusAsync(OrderStatus status)

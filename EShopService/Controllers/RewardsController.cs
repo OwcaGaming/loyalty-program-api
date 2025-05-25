@@ -1,127 +1,79 @@
-using EShop.Application.Services;
+using EShop.Application.Service;
 using EShop.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EShopService.Controllers;
 
-public class RewardsController : BaseApiController
+[Route("api/[controller]")]
+[ApiController]
+public class RewardsController : ControllerBase
 {
     private readonly IRewardService _rewardService;
-    private readonly IMemberService _memberService;
 
-    public RewardsController(IRewardService rewardService, IMemberService memberService)
+    public RewardsController(IRewardService rewardService)
     {
         _rewardService = rewardService;
-        _memberService = memberService;
     }
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetRewards()
+    public async Task<ActionResult<List<Reward>>> GetAll()
+    {
+        var rewards = await _rewardService.GetAllRewardsAsync();
+        return Ok(rewards);
+    }
+
+    [HttpGet("active")]
+    [AllowAnonymous]
+    public async Task<ActionResult<List<Reward>>> GetActive()
     {
         var rewards = await _rewardService.GetActiveRewardsAsync();
-        return HandleResult(rewards);
+        return Ok(rewards);
     }
 
     [HttpGet("{id}")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetReward(int id)
+    public async Task<ActionResult<Reward>> GetById(int id)
     {
-        var reward = await _rewardService.GetByIdAsync(id);
-        return HandleResult(reward);
-    }
-
-    [HttpGet("by-type/{type}")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetRewardsByType(RewardType type)
-    {
-        var rewards = await _rewardService.GetRewardsByTypeAsync(type);
-        return HandleResult(rewards);
+        var reward = await _rewardService.GetRewardAsync(id);
+        if (reward == null)
+            return NotFound(new { error = "Reward not found" });
+        return Ok(reward);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> CreateReward(Reward reward)
+    public async Task<ActionResult<Reward>> Create([FromBody] Reward reward)
     {
-        var result = await _rewardService.CreateAsync(reward);
-        return HandleResult(result);
+        var result = await _rewardService.AddRewardAsync(reward);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> UpdateReward(int id, Reward reward)
+    public async Task<ActionResult<Reward>> Update(int id, [FromBody] Reward reward)
     {
         if (id != reward.Id)
-            return BadRequest();
+            return BadRequest(new { error = "Id mismatch" });
 
-        var result = await _rewardService.UpdateAsync(reward);
-        return HandleResult(result);
+        var existingReward = await _rewardService.GetRewardAsync(id);
+        if (existingReward == null)
+            return NotFound(new { error = "Reward not found" });
+
+        var result = await _rewardService.UpdateRewardAsync(reward);
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> DeleteReward(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        await _rewardService.DeleteAsync(id);
-        return NoContent();
-    }
+        var reward = await _rewardService.GetRewardAsync(id);
+        if (reward == null)
+            return NotFound(new { error = "Reward not found" });
 
-    [HttpPost("{id}/redeem")]
-    public async Task<IActionResult> RedeemReward(int id)
-    {
-        var userId = GetUserId();
-        var member = await _memberService.GetByUserIdAsync(userId);
-        if (member == null)
-            return NotFound();
-
-        var result = await _rewardService.RedeemRewardAsync(id, member.Id);
-        if (!result)
-            return BadRequest("Failed to redeem reward");
-
-        return NoContent();
-    }
-
-    [HttpGet("my-redeemed")]
-    public async Task<IActionResult> GetMyRedeemedRewards()
-    {
-        var userId = GetUserId();
-        var member = await _memberService.GetByUserIdAsync(userId);
-        if (member == null)
-            return NotFound();
-
-        var rewards = await _rewardService.GetRedeemedRewardsAsync(member.Id);
-        return HandleResult(rewards);
-    }
-
-    [HttpGet("available")]
-    public async Task<IActionResult> GetAvailableRewards()
-    {
-        var userId = GetUserId();
-        var member = await _memberService.GetByUserIdAsync(userId);
-        if (member == null)
-            return NotFound();
-
-        var rewards = await _rewardService.GetAvailableRewardsForMemberAsync(member.Id);
-        return HandleResult(rewards);
-    }
-
-    [HttpGet("popular")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetPopularRewards([FromQuery] int count = 5)
-    {
-        var rewards = await _rewardService.GetPopularRewardsAsync(count);
-        return HandleResult(rewards);
-    }
-
-    [HttpPut("{id}/stock")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> UpdateStock(int id, [FromBody] int quantity)
-    {
-        var result = await _rewardService.UpdateStockQuantityAsync(id, quantity);
-        if (!result)
-            return NotFound();
-
+        await _rewardService.DeleteRewardAsync(id);
         return NoContent();
     }
 } 

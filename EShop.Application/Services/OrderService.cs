@@ -8,17 +8,20 @@ public class OrderService : IOrderService
     private readonly IOrderRepository _orderRepository;
     private readonly IProductRepository _productRepository;
     private readonly IMemberRepository _memberRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private const decimal POINTS_CONVERSION_RATE = 0.01m; // 1 point = $0.01 discount
     private const decimal POINTS_EARNING_RATE = 1; // Earn 1 point per $1 spent
 
     public OrderService(
         IOrderRepository orderRepository,
         IProductRepository productRepository,
-        IMemberRepository memberRepository)
+        IMemberRepository memberRepository,
+        IUnitOfWork unitOfWork)
     {
         _orderRepository = orderRepository;
         _productRepository = productRepository;
         _memberRepository = memberRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Order?> GetByIdAsync(int id)
@@ -69,55 +72,72 @@ public class OrderService : IOrderService
                 return null;
         }
 
-        var order = new Order
+        try
         {
-            MemberId = memberId,
-            OrderNumber = GenerateOrderNumber(),
-            Status = OrderStatus.Pending,
-            PaymentStatus = PaymentStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            OrderItems = new List<OrderItem>()
-        };
+            await _unitOfWork.BeginTransactionAsync();
 
-        decimal subtotal = 0;
-        foreach (var (productId, quantity) in orderItems)
-        {
-            var product = await _productRepository.GetByIdAsync(productId);
-            if (product == null) continue;
-
-            var orderItem = new OrderItem
+            var order = new Order
             {
-                ProductId = productId,
-                Quantity = quantity,
-                UnitPrice = product.Price,
-                PointsEarned = (int)(product.Price * quantity * POINTS_EARNING_RATE)
+                MemberId = memberId,
+                Member = member,
+                OrderNumber = GenerateOrderNumber(),
+                Status = OrderStatus.Pending,
+                PaymentStatus = PaymentStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                OrderItems = new List<OrderItem>(),
+                ShippingAddress = member.DefaultShippingAddress ?? "Not provided",
+                BillingAddress = member.DefaultBillingAddress ?? "Not provided"
             };
 
-            order.OrderItems.Add(orderItem);
-            subtotal += orderItem.UnitPrice * orderItem.Quantity;
+            decimal subtotal = 0;
+            foreach (var (productId, quantity) in orderItems)
+            {
+                var product = await _productRepository.GetByIdAsync(productId);
+                if (product == null) continue;
 
-            // Update stock
-            await _productRepository.UpdateStockQuantityAsync(productId, product.StockQuantity - quantity);
+                var orderItem = new OrderItem
+                {
+                    Order = order,
+                    Product = product,
+                    ProductId = productId,
+                    Quantity = quantity,
+                    UnitPrice = product.Price,
+                    PointsEarned = (int)(product.Price * quantity * POINTS_EARNING_RATE)
+                };
+
+                order.OrderItems.Add(orderItem);
+                subtotal += orderItem.UnitPrice * orderItem.Quantity;
+
+                // Update stock
+                await _productRepository.UpdateStockQuantityAsync(productId, product.StockQuantity - quantity);
+            }
+
+            order.TotalAmount = subtotal;
+
+            // Apply points discount if requested
+            if (pointsToUse.HasValue && pointsToUse.Value > 0 && pointsToUse.Value <= member.PointsBalance)
+            {
+                decimal pointsDiscount = pointsToUse.Value * POINTS_CONVERSION_RATE;
+                order.DiscountAmount = Math.Min(pointsDiscount, order.TotalAmount);
+                order.PointsUsed = pointsToUse.Value;
+                order.TotalAmount -= order.DiscountAmount.Value;
+
+                // Deduct points from member's balance
+                await _memberRepository.UpdatePointsBalanceAsync(memberId, member.PointsBalance - pointsToUse.Value);
+            }
+
+            // Calculate points to be earned
+            order.PointsEarned = CalculatePointsEarned(order.TotalAmount);
+
+            var createdOrder = await _orderRepository.AddAsync(order);
+            await _unitOfWork.CommitTransactionAsync();
+            return createdOrder;
         }
-
-        order.TotalAmount = subtotal;
-
-        // Apply points discount if requested
-        if (pointsToUse.HasValue && pointsToUse.Value > 0 && pointsToUse.Value <= member.PointsBalance)
+        catch
         {
-            decimal pointsDiscount = pointsToUse.Value * POINTS_CONVERSION_RATE;
-            order.DiscountAmount = Math.Min(pointsDiscount, order.TotalAmount);
-            order.PointsUsed = pointsToUse.Value;
-            order.TotalAmount -= order.DiscountAmount.Value;
-
-            // Deduct points from member's balance
-            await _memberRepository.UpdatePointsBalanceAsync(memberId, member.PointsBalance - pointsToUse.Value);
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
         }
-
-        // Calculate points to be earned
-        order.PointsEarned = await CalculatePointsEarnedAsync(order.TotalAmount);
-
-        return await _orderRepository.AddAsync(order);
     }
 
     public async Task<Order?> GetOrderWithDetailsAsync(int orderId)
@@ -174,33 +194,45 @@ public class OrderService : IOrderService
         if (order == null || order.Status == OrderStatus.Delivered)
             return false;
 
-        // Restore stock
-        foreach (var orderItem in order.OrderItems)
+        try
         {
-            var product = await _productRepository.GetByIdAsync(orderItem.ProductId);
-            if (product != null)
-            {
-                await _productRepository.UpdateStockQuantityAsync(
-                    orderItem.ProductId,
-                    product.StockQuantity + orderItem.Quantity
-                );
-            }
-        }
+            await _unitOfWork.BeginTransactionAsync();
 
-        // Restore points if they were used
-        if (order.PointsUsed.HasValue && order.PointsUsed.Value > 0)
+            // Restore stock
+            foreach (var orderItem in order.OrderItems)
+            {
+                var product = await _productRepository.GetByIdAsync(orderItem.ProductId);
+                if (product != null)
+                {
+                    await _productRepository.UpdateStockQuantityAsync(
+                        orderItem.ProductId,
+                        product.StockQuantity + orderItem.Quantity
+                    );
+                }
+            }
+
+            // Restore points if they were used
+            if (order.PointsUsed.HasValue && order.PointsUsed.Value > 0)
+            {
+                var member = await _memberRepository.GetByIdAsync(order.MemberId);
+                if (member != null)
+                {
+                    await _memberRepository.UpdatePointsBalanceAsync(
+                        order.MemberId,
+                        member.PointsBalance + order.PointsUsed.Value
+                    );
+                }
+            }
+
+            var success = await _orderRepository.UpdateOrderStatusAsync(orderId, OrderStatus.Cancelled);
+            await _unitOfWork.CommitTransactionAsync();
+            return success;
+        }
+        catch
         {
-            var member = await _memberRepository.GetByIdAsync(order.MemberId);
-            if (member != null)
-            {
-                await _memberRepository.UpdatePointsBalanceAsync(
-                    order.MemberId,
-                    member.PointsBalance + order.PointsUsed.Value
-                );
-            }
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
         }
-
-        return await _orderRepository.UpdateOrderStatusAsync(orderId, OrderStatus.Cancelled);
     }
 
     public async Task<decimal> CalculateOrderTotalAsync(IEnumerable<(int ProductId, int Quantity)> orderItems)
@@ -217,7 +249,7 @@ public class OrderService : IOrderService
         return total;
     }
 
-    public async Task<int> CalculatePointsEarnedAsync(decimal orderTotal)
+    public int CalculatePointsEarned(decimal orderTotal)
     {
         return (int)(orderTotal * POINTS_EARNING_RATE);
     }

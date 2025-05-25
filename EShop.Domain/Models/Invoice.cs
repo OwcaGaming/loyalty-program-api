@@ -5,30 +5,26 @@ namespace EShop.Domain.Models;
 public class Invoice : BaseModel
 {
     [Required]
-    public string InvoiceNumber { get; set; }
+    public required string InvoiceNumber { get; set; }
     
     public int OrderId { get; set; }
-    public Order Order { get; set; }
+    public required Order Order { get; set; }
     
-    [Required]
+    public DateTime IssueDate { get; set; } = DateTime.UtcNow;
+    
+    public DateTime? DueDate { get; set; }
+    
     public decimal TotalAmount { get; set; }
     
     public decimal? TaxAmount { get; set; }
     
-    public string? PdfUrl { get; set; }
-    
-    public DateTime IssuedAt { get; set; }
-    
-    public DateTime? PaidAt { get; set; }
-    
-    public InvoiceStatus Status { get; set; }
+    public InvoiceStatus Status { get; set; } = InvoiceStatus.Pending;
 }
 
 public enum InvoiceStatus
 {
-    Draft,
-    Issued,
+    Pending,
     Paid,
-    Cancelled,
-    Refunded
+    Overdue,
+    Cancelled
 } 

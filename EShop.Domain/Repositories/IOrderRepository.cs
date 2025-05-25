@@ -4,6 +4,7 @@ namespace EShop.Domain.Repositories;
 
 public interface IOrderRepository : IRepository<Order>
 {
+    Task<IEnumerable<Order>> GetOrdersByMemberIdAsync(int memberId);
     Task<IEnumerable<Order>> GetOrdersByMemberAsync(int memberId);
     Task<Order?> GetOrderWithDetailsAsync(int orderId);
     Task<IEnumerable<Order>> GetOrdersByStatusAsync(OrderStatus status);

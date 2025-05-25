@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EShopService.Controllers;
 
-public class AuthController : BaseApiController
+[Route("api/[controller]")]
+[ApiController]
+public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
 
@@ -15,42 +17,60 @@ public class AuthController : BaseApiController
 
     [HttpPost("register")]
     [AllowAnonymous]
-    public async Task<IActionResult> Register(RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await _authService.RegisterAsync(request);
         if (!result.Success)
-            return BadRequest(result.Errors);
+            return BadRequest(new { errors = result.Errors });
 
-        return Ok(new { result.Token, result.User });
+        return Ok(new { token = result.Token, user = result.User });
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var result = await _authService.LoginAsync(request);
         if (!result.Success)
-            return BadRequest(result.Errors);
+            return BadRequest(new { errors = result.Errors });
 
-        return Ok(new { result.Token, result.User });
+        return Ok(new { token = result.Token, user = result.User });
     }
 
     [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword)
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
-        var userId = GetUserId();
-        var result = await _authService.ChangePasswordAsync(userId, currentPassword, newPassword);
-        if (!result.Success)
-            return BadRequest(result.Errors);
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
 
-        return Ok(new { result.Token });
+        var result = await _authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        if (!result.Success)
+            return BadRequest(new { errors = result.Errors });
+
+        return Ok(new { token = result.Token });
     }
 
-    [HttpPost("validate-token")]
+    [HttpPost("validate")]
     [AllowAnonymous]
-    public async Task<IActionResult> ValidateToken(string token)
+    public async Task<IActionResult> ValidateToken([FromBody] ValidateTokenRequest request)
     {
-        var isValid = await _authService.ValidateTokenAsync(token);
+        if (string.IsNullOrEmpty(request.Token))
+            return BadRequest(new { error = "Token is required" });
+
+        var isValid = await _authService.ValidateTokenAsync(request.Token);
         return Ok(new { isValid });
     }
+}
+
+public class ChangePasswordRequest
+{
+    public required string CurrentPassword { get; set; }
+    public required string NewPassword { get; set; }
+}
+
+public class ValidateTokenRequest
+{
+    public required string Token { get; set; }
 } 

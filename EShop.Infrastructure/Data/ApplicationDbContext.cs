@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EShop.Infrastructure.Data;
 
-public class ApplicationDbContext : IdentityDbContext<User>, IApplicationDbContext
+public class ApplicationDbContext : IdentityDbContext, IApplicationDbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -19,6 +19,7 @@ public class ApplicationDbContext : IdentityDbContext<User>, IApplicationDbConte
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<PointsTransaction> PointsTransactions { get; set; }
     public DbSet<Reward> Rewards { get; set; }
+    public DbSet<RewardRedemption> RewardRedemptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -44,26 +45,38 @@ public class ApplicationDbContext : IdentityDbContext<User>, IApplicationDbConte
         // Configure relationships
         builder.Entity<Order>()
             .HasMany(o => o.OrderItems)
-            .WithOne()
+            .WithOne(oi => oi.Order)
             .HasForeignKey(oi => oi.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Member>()
-            .HasMany<Order>()
-            .WithOne()
+            .HasMany(m => m.Orders)
+            .WithOne(o => o.Member)
             .HasForeignKey(o => o.MemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Member>()
-            .HasMany<PointsTransaction>()
-            .WithOne()
+            .HasMany(m => m.PointsTransactions)
+            .WithOne(pt => pt.Member)
             .HasForeignKey(pt => pt.MemberId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Product>()
-            .HasOne<Category>()
-            .WithMany()
+            .HasOne(p => p.Category)
+            .WithMany(c => c.Products)
             .HasForeignKey(p => p.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RewardRedemption>()
+            .HasOne(r => r.Member)
+            .WithMany(m => m.RewardRedemptions)
+            .HasForeignKey(r => r.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RewardRedemption>()
+            .HasOne(r => r.Reward)
+            .WithMany(r => r.Redemptions)
+            .HasForeignKey(r => r.RewardId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 } 

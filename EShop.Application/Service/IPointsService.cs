@@ -1,4 +1,4 @@
-using EShopDomain.Models;
+using EShop.Domain.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 

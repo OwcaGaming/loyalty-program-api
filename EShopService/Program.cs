@@ -23,9 +23,9 @@ namespace EShopService
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Configure DbContext
+            // Configure DbContext to use in-memory database
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseInMemoryDatabase("EShopDb"));
 
             // Configure Identity
             builder.Services.AddIdentity<User, IdentityRole>(options =>
@@ -63,7 +63,13 @@ namespace EShopService
             });
 
             // Register repositories
-            builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+            builder.Services.AddScoped(typeof(IRepository<>), typeof(EShop.Infrastructure.Repositories.Repository<>));
+            builder.Services.AddScoped<IMemberRepository, EShop.Infrastructure.Repositories.MemberRepository>();
+            builder.Services.AddScoped<IProductRepository, EShop.Infrastructure.Repositories.ProductRepository>();
+            builder.Services.AddScoped<IOrderRepository, EShop.Infrastructure.Repositories.OrderRepository>();
+            builder.Services.AddScoped<IRewardRepository, EShop.Infrastructure.Repositories.RewardRepository>();
+            builder.Services.AddScoped<IPointsTransactionRepository, EShop.Infrastructure.Repositories.PointsTransactionRepository>();
+            builder.Services.AddScoped<IUnitOfWork, EShop.Infrastructure.Repositories.UnitOfWork>();
 
             // Register services
             builder.Services.AddScoped<IAuthService, AuthService>();

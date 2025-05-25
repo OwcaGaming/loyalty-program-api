@@ -2,6 +2,7 @@ using EShop.Application.Services;
 using EShop.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace EShopService.Controllers;
 
@@ -57,7 +58,8 @@ public class OrdersController : BaseApiController
 
     public class CreateOrderRequest
     {
-        public List<OrderItemRequest> Items { get; set; }
+        [Required]
+        public List<OrderItemRequest> Items { get; set; } = new();
         public int? PointsToUse { get; set; }
     }
 
@@ -143,7 +145,7 @@ public class OrdersController : BaseApiController
     {
         var orderItems = items.Select(i => (i.ProductId, i.Quantity)).ToList();
         var total = await _orderService.CalculateOrderTotalAsync(orderItems);
-        var pointsToEarn = await _orderService.CalculatePointsEarnedAsync(total);
+        var pointsToEarn = _orderService.CalculatePointsEarned(total);
 
         return Ok(new { total, pointsToEarn });
     }

@@ -11,5 +11,5 @@ public interface IOrderService : IService<Order>
     Task<bool> ProcessPaymentAsync(int orderId, string paymentTransactionId);
     Task<bool> CancelOrderAsync(int orderId);
     Task<decimal> CalculateOrderTotalAsync(IEnumerable<(int ProductId, int Quantity)> orderItems);
-    Task<int> CalculatePointsEarnedAsync(decimal orderTotal);
+    int CalculatePointsEarned(decimal orderTotal);
 } 

@@ -18,6 +18,9 @@ public abstract class BaseApiController : ControllerBase
 
     protected string GetUserId()
     {
-        return User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null)
+            throw new UnauthorizedAccessException("User ID not found in claims");
+        return userId;
     }
 } 

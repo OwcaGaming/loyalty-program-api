@@ -32,6 +32,17 @@ public class AuthService : IAuthService
             return new AuthResult(false, new[] { "User with this email already exists" });
         }
 
+        // Create member first
+        var member = new Member
+        {
+            Name = $"{request.FirstName} {request.LastName}",
+            Email = request.Email,
+            DateJoined = DateTime.UtcNow,
+            Tier = MemberTier.Standard
+        };
+
+        member = await _memberService.CreateAsync(member);
+
         var user = new User
         {
             Email = request.Email,
@@ -39,7 +50,8 @@ public class AuthService : IAuthService
             FirstName = request.FirstName,
             LastName = request.LastName,
             CreatedAt = DateTime.UtcNow,
-            IsActive = true
+            IsActive = true,
+            Member = member
         };
 
         var createUserResult = await _userManager.CreateAsync(user, request.Password);
@@ -48,17 +60,9 @@ public class AuthService : IAuthService
             return new AuthResult(false, createUserResult.Errors.Select(e => e.Description).ToArray());
         }
 
-        // Create associated member
-        var member = new Member
-        {
-            Name = $"{request.FirstName} {request.LastName}",
-            Email = request.Email,
-            UserId = user.Id,
-            DateJoined = DateTime.UtcNow,
-            Tier = MemberTier.Standard
-        };
-
-        await _memberService.CreateAsync(member);
+        // Update member with user ID
+        member.UserId = user.Id;
+        await _memberService.UpdateAsync(member);
 
         var token = GenerateJwtToken(user);
         return new AuthResult(true, Array.Empty<string>(), token, user);
@@ -100,14 +104,17 @@ public class AuthService : IAuthService
         return new AuthResult(true, Array.Empty<string>(), token, user);
     }
 
-    public Task<bool> ValidateTokenAsync(string token)
+    public async Task<bool> ValidateTokenAsync(string token)
     {
+        if (string.IsNullOrEmpty(token))
+            return false;
+
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_jwtSettings.SecretKey);
 
         try
         {
-            tokenHandler.ValidateToken(token, new TokenValidationParameters
+            await Task.Run(() => tokenHandler.ValidateToken(token, new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
@@ -116,13 +123,13 @@ public class AuthService : IAuthService
                 ValidIssuer = _jwtSettings.Issuer,
                 ValidAudience = _jwtSettings.Audience,
                 ClockSkew = TimeSpan.Zero
-            }, out _);
+            }, out _));
 
-            return Task.FromResult(true);
+            return true;
         }
         catch
         {
-            return Task.FromResult(false);
+            return false;
         }
     }
 
@@ -134,8 +141,8 @@ public class AuthService : IAuthService
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
-            new(JwtRegisteredClaimNames.Email, user.Email),
-            new(ClaimTypes.Name, user.UserName),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(ClaimTypes.Name, user.UserName ?? user.Email ?? string.Empty),
             new(ClaimTypes.GivenName, user.FirstName),
             new(ClaimTypes.Surname, user.LastName)
         };

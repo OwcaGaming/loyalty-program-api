@@ -1,4 +1,4 @@
-using EShopDomain.Models;
+using EShop.Domain.Models;
 using EShop.Domain.Repositories;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -7,16 +7,47 @@ namespace EShop.Application.Service
 {
     public class RewardService : IRewardService
     {
-        private readonly IRepository _repository;
-        public RewardService(IRepository repository)
+        private readonly IRepository<Reward> _repository;
+
+        public RewardService(IRepository<Reward> repository)
         {
             _repository = repository;
         }
-        public Task<Reward> AddRewardAsync(Reward reward) => _repository.AddRewardAsync(reward);
-        public Task<Reward?> GetRewardAsync(int id) => _repository.GetRewardAsync(id);
-        public Task<List<Reward>> GetAllRewardsAsync() => _repository.GetAllRewardsAsync();
-        public Task<List<Reward>> GetActiveRewardsAsync() => _repository.GetActiveRewardsAsync();
-        public Task<Reward> UpdateRewardAsync(Reward reward) => _repository.UpdateRewardAsync(reward);
-        public Task DeleteRewardAsync(int id) => _repository.DeleteRewardAsync(id);
+
+        public async Task<Reward> AddRewardAsync(Reward reward)
+        {
+            return await _repository.AddAsync(reward);
+        }
+
+        public async Task<Reward?> GetRewardAsync(int id)
+        {
+            return await _repository.GetByIdAsync(id);
+        }
+
+        public async Task<List<Reward>> GetAllRewardsAsync()
+        {
+            var rewards = await _repository.GetAllAsync();
+            return rewards.ToList();
+        }
+
+        public async Task<List<Reward>> GetActiveRewardsAsync()
+        {
+            var rewards = await _repository.FindAsync(r => r.IsActive);
+            return rewards.ToList();
+        }
+
+        public async Task<Reward> UpdateRewardAsync(Reward reward)
+        {
+            return await _repository.UpdateAsync(reward);
+        }
+
+        public async Task DeleteRewardAsync(int id)
+        {
+            var reward = await _repository.GetByIdAsync(id);
+            if (reward != null)
+            {
+                await _repository.DeleteAsync(reward);
+            }
+        }
     }
 } 

@@ -1,7 +1,7 @@
 using EShop.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace EShop.Infrastructure.Data
+namespace EShop.Domain.Data
 {
     public interface IApplicationDbContext
     {
