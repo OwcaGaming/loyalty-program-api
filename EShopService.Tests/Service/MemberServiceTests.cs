@@ -1,5 +1,5 @@
-using EShop.Application.Service;
-using EShopDomain.Models;
+using EShop.Application.Services;
+using EShop.Domain.Models;
 using EShop.Domain.Repositories;
 using Moq;
 using System.Collections.Generic;
@@ -10,58 +10,71 @@ namespace EShopService.Tests.Service
 {
     public class MemberServiceTests
     {
-        private readonly Mock<IRepository> _repoMock;
+        private readonly Mock<IMemberRepository> _memberRepoMock;
+        private readonly Mock<IOrderRepository> _orderRepoMock;
+        private readonly Mock<IPointsTransactionRepository> _pointsTransactionRepoMock;
+        private readonly Mock<IUnitOfWork> _unitOfWorkMock;
         private readonly MemberService _service;
 
         public MemberServiceTests()
         {
-            _repoMock = new Mock<IRepository>();
-            _service = new MemberService(_repoMock.Object);
+            _memberRepoMock = new Mock<IMemberRepository>();
+            _orderRepoMock = new Mock<IOrderRepository>();
+            _pointsTransactionRepoMock = new Mock<IPointsTransactionRepository>();
+            _unitOfWorkMock = new Mock<IUnitOfWork>();
+            _service = new MemberService(_memberRepoMock.Object, _orderRepoMock.Object, _pointsTransactionRepoMock.Object, _unitOfWorkMock.Object);
         }
 
         [Fact]
-        public async Task AddMemberAsync_CallsRepo()
+        public async Task CreateAsync_CallsRepo()
         {
-            var member = new Member { Id = 1 };
-            _repoMock.Setup(r => r.AddMemberAsync(member)).ReturnsAsync(member);
-            var result = await _service.AddMemberAsync(member);
+            var member = new Member { Id = 1, Name = "Test", Email = "test@email.com" };
+            _memberRepoMock.Setup(r => r.GetByEmailAsync(member.Email)).ReturnsAsync((Member?)null);
+            _memberRepoMock.Setup(r => r.AddAsync(member)).ReturnsAsync(member);
+            var result = await _service.CreateAsync(member);
             Assert.Equal(member, result);
-            _repoMock.Verify(r => r.AddMemberAsync(member), Times.Once);
+            _memberRepoMock.Verify(r => r.AddAsync(member), Times.Once);
         }
 
         [Fact]
-        public async Task GetMemberAsync_CallsRepo()
+        public async Task GetByIdAsync_CallsRepo()
         {
-            _repoMock.Setup(r => r.GetMemberAsync(1)).ReturnsAsync(new Member { Id = 1 });
-            var result = await _service.GetMemberAsync(1);
+            _memberRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(new Member { Id = 1, Name = "Test", Email = "test@email.com" });
+            var result = await _service.GetByIdAsync(1);
             Assert.NotNull(result);
-            _repoMock.Verify(r => r.GetMemberAsync(1), Times.Once);
+            _memberRepoMock.Verify(r => r.GetByIdAsync(1), Times.Once);
         }
 
         [Fact]
-        public async Task GetAllMembersAsync_CallsRepo()
+        public async Task GetAllAsync_CallsRepo()
         {
-            _repoMock.Setup(r => r.GetAllMembersAsync()).ReturnsAsync(new List<Member>());
-            var result = await _service.GetAllMembersAsync();
+            _memberRepoMock.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<Member>());
+            var result = await _service.GetAllAsync();
             Assert.NotNull(result);
-            _repoMock.Verify(r => r.GetAllMembersAsync(), Times.Once);
+            _memberRepoMock.Verify(r => r.GetAllAsync(), Times.Once);
         }
 
         [Fact]
-        public async Task UpdateMemberAsync_CallsRepo()
+        public async Task UpdateAsync_CallsRepo()
         {
-            var member = new Member { Id = 1 };
-            _repoMock.Setup(r => r.UpdateMemberAsync(member)).ReturnsAsync(member);
-            var result = await _service.UpdateMemberAsync(member);
+            var member = new Member { Id = 1, Name = "Test", Email = "test@email.com" };
+            _memberRepoMock.Setup(r => r.GetByIdAsync(member.Id)).ReturnsAsync(member);
+            _memberRepoMock.Setup(r => r.GetByEmailAsync(member.Email)).ReturnsAsync((Member?)null);
+            _memberRepoMock.Setup(r => r.UpdateAsync(member)).ReturnsAsync(member);
+            var result = await _service.UpdateAsync(member);
             Assert.Equal(member, result);
-            _repoMock.Verify(r => r.UpdateMemberAsync(member), Times.Once);
+            _memberRepoMock.Verify(r => r.UpdateAsync(member), Times.Once);
         }
 
         [Fact]
-        public async Task DeleteMemberAsync_CallsRepo()
+        public async Task DeleteAsync_CallsRepo()
         {
-            await _service.DeleteMemberAsync(1);
-            _repoMock.Verify(r => r.DeleteMemberAsync(1), Times.Once);
+            var member = new Member { Id = 1, Name = "Test", Email = "test@email.com" };
+            _memberRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(member);
+            _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
+            _unitOfWorkMock.Setup(u => u.CommitTransactionAsync()).Returns(Task.CompletedTask);
+            await _service.DeleteAsync(1);
+            _memberRepoMock.Verify(r => r.DeleteAsync(member), Times.Once);
         }
     }
 } 

@@ -41,6 +41,10 @@ namespace EShopService
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
+            if (jwtSettings == null)
+            {
+                throw new InvalidOperationException("JwtSettings configuration section is missing or invalid.");
+            }
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 
             builder.Services.AddAuthentication(options =>

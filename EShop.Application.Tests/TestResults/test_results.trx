@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="0120191e-0bc6-4d9c-adc4-a4b3649c0c6e" name="adam@DESKTOP-V03DCJM 2025-06-22 16:23:18" runUser="DESKTOP-V03DCJM\adam" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-06-22T16:23:18.8511869+02:00" queuing="2025-06-22T16:23:18.8511873+02:00" start="2025-06-22T16:23:18.0210449+02:00" finish="2025-06-22T16:23:18.8516764+02:00" />
+  <TestSettings name="default" id="d0afbb52-0c99-4cce-9aee-c1088bec6a62">
+    <Deployment runDeploymentRoot="adam_DESKTOP-V03DCJM_2025-06-22_16_23_18" />
+  </TestSettings>
+  <TestLists>
+    <TestList name="Wyniki, których nie ma na liście" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Wszystkie załadowane wyniki" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="0" executed="0" passed="0" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.3.1+6b60a9e56a (64-bit .NET 8.0.17)&#xD;
+[xUnit.net 00:00:00.12]   Discovering: EShop.Application.Tests&#xD;
+[xUnit.net 00:00:00.14]   Discovered:  EShop.Application.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="DESKTOP-V03DCJM" outcome="Warning" timestamp="2025-06-22T16:23:18.7469944+02:00">
+        <Text>W elemencie C:\Users\adam\Desktop\pp4\loyalty-program-api\EShop.Application.Tests\bin\Debug\net8.0\EShop.Application.Tests.dll nie są dostępne żadne testy. Upewnij się, że wykrywacze i moduły wykonywania testów są zarejestrowane oraz że ustawienia wersji platformy i struktury są odpowiednie, a następnie spróbuj ponownie.</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>
